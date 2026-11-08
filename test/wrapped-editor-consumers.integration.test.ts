@@ -612,6 +612,25 @@ describe("host reset of the custom editor (Zentui loaded before other extensions
 		await h.emit("session_shutdown");
 	});
 
+	it("delays the first plain install so a startup rebind cannot drop it", async () => {
+		// The delay is skipped under Vitest; exercise the real-startup branch explicitly.
+		const saved = process.env.VITEST;
+		delete process.env.VITEST;
+		try {
+			const h = harness();
+			await h.emit("session_start");
+			await flush();
+			expect(h.ctx.ui.getEditorComponent()).toBeUndefined();
+
+			await vi.advanceTimersByTimeAsync(600);
+			expect(h.ctx.ui.getEditorComponent()).toBeDefined();
+			await h.emit("session_shutdown");
+		} finally {
+			if (saved === undefined) delete process.env.VITEST;
+			else process.env.VITEST = saved;
+		}
+	});
+
 	it("keeps a default-editor takeover by default", async () => {
 		const h = harness();
 		await h.emit("session_start");

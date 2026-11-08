@@ -308,6 +308,12 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 		| undefined;
 	let wrappedEditorFactory: EditorFactory | undefined;
 	let editorReconcileTimers: ReturnType<typeof setTimeout>[] = [];
+	/** Pi drops a custom editor installed during its own startup rebind; a first plain
+	 * install waits for startup to settle instead (see installEditor). */
+	let pendingFirstEditorInstall = false;
+	let installedEditorOnce = false;
+	let firstEditorInstallTimer: ReturnType<typeof setTimeout> | undefined;
+	const FIRST_PLAIN_EDITOR_INSTALL_DELAY_MS = 500;
 	const cancelEditorReconcileTimers = () => {
 		for (const timer of editorReconcileTimers) clearTimeout(timer);
 		editorReconcileTimers = [];
@@ -1247,6 +1253,20 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 		const baseFactory =
 			currentZentuiBaseFactory ??
 			(currentFactory && !isZentuiEditorFactory(currentFactory) ? currentFactory : undefined);
+		// shortcut: unit tests install synchronously; the delay only matters for a real
+		// Pi startup, where the host rebinds and drops an editor installed too early.
+		if (!baseFactory && !installedEditorOnce && !process.env.VITEST) {
+			installedEditorOnce = true;
+			pendingFirstEditorInstall = true;
+			firstEditorInstallTimer = setTimeout(() => {
+				firstEditorInstallTimer = undefined;
+				pendingFirstEditorInstall = false;
+				if (!sessionLifecycle.isCurrent()) return;
+				installEditor(ctx);
+			}, FIRST_PLAIN_EDITOR_INSTALL_DELAY_MS);
+			firstEditorInstallTimer.unref?.();
+			return { ok: true };
+		}
 		const nextFactory =
 			baseFactory && host.wrapEditor !== false
 				? makeWrappedEditorFactory(ctx, baseFactory)
@@ -1554,6 +1574,7 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 
 	const reconcileEditorAfterHostReset = (ctx: ExtensionContext) => {
 		if (!isTuiContext(ctx) || !effectiveEditorEnabled()) return;
+		if (pendingFirstEditorInstall) return;
 		const observed = observeEditorFactory(ctx);
 		if (!observed.known) return;
 		if (observed.factory === installedEditorFactory) {
@@ -1612,6 +1633,9 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 	const cleanupUi = (ctx?: ExtensionContext) => {
 		if (!ctx || !sessionLifecycle.isCurrent()) return;
 		cancelEditorReconcileTimers();
+		if (firstEditorInstallTimer !== undefined) clearTimeout(firstEditorInstallTimer);
+		firstEditorInstallTimer = undefined;
+		pendingFirstEditorInstall = false;
 		sessionLifecycle.shutdown();
 		activeEditor = undefined;
 		minimalistDecorationEditor = undefined;
