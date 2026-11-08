@@ -200,6 +200,7 @@ Reference only—not a starter file. Prefer the minimal overrides above. Optiona
 			"colorSource": "terminal",
 			"borderColorMode": "static",
 			"modelLabel": "id",
+			"recoverHostReset": false,
 			"viewportIndicators": true,
 			"styles": {
 				"opencode": {
@@ -446,6 +447,7 @@ Reference only—not a starter file. Prefer the minimal overrides above. Optiona
 - `projectRefreshIntervalMs` controls project-status polling, not opt-in quota refresh. `0` disables project polling. Values `1..4999` clamp to the five-second minimum; invalid or non-finite values use `30000`.
 - `components.editor` owns Editor enablement, `opencode | opencode-copy-friendly | accent-rail | minimalist` style selection, color source, border mode, model label, viewport indicators, and all four style configurations.
 - Editor `modelLabel` uses `id` by default; `name` uses the display name with ID fallback. Footer has an independent `modelLabel` control.
+- `components.editor.recoverHostReset` (default `false`) re-installs Zentui's editor when Pi clears the custom editor during its startup rebind (`resetExtensionUI`). Pi clears it *after* `session_start` when Zentui loads before other extensions, so a Zentui package placed early in `settings.json` loses its editor unless this is `true`. The default keeps a deliberate post-start takeover by Pi's default editor.
 - `components.userMessages` owns User-message enablement, `framed | framed-copy-friendly | compact | labeled` style selection, and color source. Disabling it delegates byte-for-byte to Pi's native renderer.
 - `components.toolDisplay` independently owns opt-in tool-call/result rendering. `bashSyntax` (`semantic | pi`, default `semantic`) colors the Bash command row only; presets never change it. Disabled or `style: "native"` delegates unchanged. Unsupported hosts stay native; saved preferences remain dormant. Only this owner is persisted by its settings edits, and no pi-tool-display config is read or written. See [Tool display modes, ownership and limits](./tool-display.md).
 - `components.thinkingSteps` independently owns opt-in **Thinking (Experimental)** display. It defaults to `{ "enabled": false, "mode": "tree" }`; canonical modes are `rail | tree | streaming`. The former persisted `streaming-experimental` value is accepted only as a migration alias and is normalized to `streaming` on save.

@@ -105,6 +105,7 @@ describe("canonical config resolution", () => {
 				colorSource: "terminal",
 				borderColorMode: "static",
 				modelLabel: "id",
+				recoverHostReset: false,
 				viewportIndicators: true,
 				styles: {
 					opencode: {

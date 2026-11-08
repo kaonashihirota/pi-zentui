@@ -578,3 +578,47 @@ describe("working-line border placement through a layered editor", () => {
 		},
 	);
 });
+
+describe("host reset of the custom editor (Zentui loaded before other extensions)", () => {
+	it("reinstalls its editor after the host clears it when recoverHostReset is on", async () => {
+		runtime.configure = (config) => {
+			config.components.editor.recoverHostReset = true;
+		};
+		const h = harness();
+		await h.emit("session_start");
+		await flush();
+		const installed = h.ctx.ui.getEditorComponent();
+		expect(installed).toBeDefined();
+
+		// pi's resetExtensionUI() drops the custom editor on session rebind.
+		h.ctx.ui.setEditorComponent(undefined);
+		expect(h.ctx.ui.getEditorComponent()).toBeUndefined();
+
+		await vi.advanceTimersByTimeAsync(300);
+		expect(h.ctx.ui.getEditorComponent()).toBeDefined();
+		await h.emit("session_shutdown");
+	});
+
+	it("leaves a foreign editor installed", async () => {
+		runtime.configure = (config) => {
+			config.components.editor.recoverHostReset = true;
+		};
+		const h = harness();
+		await h.emit("session_start");
+		await flush();
+		const wrapper = h.installForeignWrapper();
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(h.ctx.ui.getEditorComponent()).toBe(wrapper);
+		await h.emit("session_shutdown");
+	});
+
+	it("keeps a default-editor takeover by default", async () => {
+		const h = harness();
+		await h.emit("session_start");
+		await flush();
+		h.ctx.ui.setEditorComponent(undefined);
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(h.ctx.ui.getEditorComponent()).toBeUndefined();
+		await h.emit("session_shutdown");
+	});
+});

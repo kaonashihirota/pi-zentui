@@ -214,6 +214,8 @@ export type EditorComponentConfig = {
 	colorSource: ColorSource;
 	borderColorMode: EditorBorderColorMode;
 	modelLabel: ModelLabelSource;
+	/** Re-install the editor if the host clears it during startup rebind (needed when Zentui loads before other extensions). */
+	recoverHostReset: boolean;
 	viewportIndicators: boolean;
 	styles: {
 		opencode: PolishedEditorStyleConfig;
@@ -614,6 +616,7 @@ const defaultComponents: ComponentsConfig = {
 		colorSource: "terminal",
 		borderColorMode: "static",
 		modelLabel: "id",
+		recoverHostReset: false,
 		viewportIndicators: true,
 		styles: {
 			opencode: {
@@ -1483,6 +1486,10 @@ function resolveComponents(config: ConfigRecord): ComponentsConfig {
 			viewportIndicators: parseBoolean(
 				resolvedValue(editor, "viewportIndicators", features, "viewportIndicators"),
 				defaultComponents.editor.viewportIndicators,
+			),
+			recoverHostReset: parseBoolean(
+				editor.recoverHostReset,
+				defaultComponents.editor.recoverHostReset,
 			),
 			styles: {
 				opencode: {

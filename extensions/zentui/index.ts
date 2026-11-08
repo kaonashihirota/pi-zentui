@@ -307,6 +307,11 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 		  }
 		| undefined;
 	let wrappedEditorFactory: EditorFactory | undefined;
+	let editorReconcileTimers: ReturnType<typeof setTimeout>[] = [];
+	const cancelEditorReconcileTimers = () => {
+		for (const timer of editorReconcileTimers) clearTimeout(timer);
+		editorReconcileTimers = [];
+	};
 	let stopSessionTimer: () => void = () => {};
 	let stopMinimalistDurationUpdates: () => void = () => {};
 	let minimalistDurationUpdatesActive = false;
@@ -1545,33 +1550,68 @@ export default function (pi: ExtensionAPI, host: ZentuiHost = {}) {
 		refresh();
 	};
 
-	const scheduleEditorReconciliation = (ctx: ExtensionContext) => {
-		sessionLifecycle.defer(() => {
-			if (!isTuiContext(ctx) || !effectiveEditorEnabled()) return;
-			const observed = observeEditorFactory(ctx);
-			if (!observed.known) return;
-			if (observed.factory === installedEditorFactory) {
-				reconcileProjectRefresh(ctx);
-				const previousTotals = state.usageTotals;
-				syncFooterUsage(ctx);
-				if (state.usageTotals !== previousTotals) refresh();
-				return;
-			}
-			if (!observed.factory || !isOwnedEditorFactory(observed.factory)) {
+	const hostResetRecoveryEnabled = () => currentConfig.components.editor.recoverHostReset === true;
+
+	const reconcileEditorAfterHostReset = (ctx: ExtensionContext) => {
+		if (!isTuiContext(ctx) || !effectiveEditorEnabled()) return;
+		const observed = observeEditorFactory(ctx);
+		if (!observed.known) return;
+		if (observed.factory === installedEditorFactory) {
+			reconcileProjectRefresh(ctx);
+			const previousTotals = state.usageTotals;
+			syncFooterUsage(ctx);
+			if (state.usageTotals !== previousTotals) refresh();
+			return;
+		}
+		if (!observed.factory) {
+			// The host drops the custom editor on session rebind (resetExtensionUI), which
+			// happens after this extension's session_start when Zentui loads first.
+			if (hostResetRecoveryEnabled()) {
 				clearEditorOwnership();
+				reconcileEditor(ctx);
 				reconcileProjectRefresh(ctx);
 				refresh();
 				return;
 			}
-			trackZentuiEditorFactory(observed.factory);
+			// Default: the default editor taking over after start is a deliberate choice.
+			clearEditorOwnership();
 			reconcileProjectRefresh(ctx);
-			syncFooterUsage(ctx);
+			return;
+		}
+		if (!isOwnedEditorFactory(observed.factory)) {
+			clearEditorOwnership();
+			reconcileProjectRefresh(ctx);
 			refresh();
-		});
+			return;
+		}
+		trackZentuiEditorFactory(observed.factory);
+		reconcileProjectRefresh(ctx);
+		syncFooterUsage(ctx);
+		refresh();
+	};
+
+	const scheduleEditorReconciliation = (ctx: ExtensionContext) => {
+		sessionLifecycle.defer(() => reconcileEditorAfterHostReset(ctx));
+		cancelEditorReconcileTimers();
+		if (!hostResetRecoveryEnabled()) return;
+		// The rebind that clears the editor may land after the deferred pass, so re-check
+		// briefly while startup settles.
+		for (const delay of [250, 1000, 2500]) {
+			const timer = setTimeout(() => {
+				if (!sessionLifecycle.isCurrent()) return;
+				const observed = observeEditorFactory(ctx);
+				// Only step in when the host dropped the editor we installed; a foreign
+				// company editor stays untouched.
+				if (observed.known && observed.factory === undefined) reconcileEditorAfterHostReset(ctx);
+			}, delay);
+			timer.unref?.();
+			editorReconcileTimers.push(timer);
+		}
 	};
 
 	const cleanupUi = (ctx?: ExtensionContext) => {
 		if (!ctx || !sessionLifecycle.isCurrent()) return;
+		cancelEditorReconcileTimers();
 		sessionLifecycle.shutdown();
 		activeEditor = undefined;
 		minimalistDecorationEditor = undefined;
