@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	getExtensionStatusColorMode,
+	getHiddenExtensionStatusColor,
 	getHiddenExtensionStatusColorMode,
 	mergeConfig,
 	saveExtensionStatusDefaultVisibility,
@@ -11,6 +12,20 @@ import {
 } from "../extensions/zentui/config";
 
 describe("Hidden extension status colors", () => {
+	it("uses muted unless a Hidden color is configured", () => {
+		expect(getHiddenExtensionStatusColor(mergeConfig({}).components.extensionStatuses)).toBe("muted");
+		const config = mergeConfig({
+			components: { extensionStatuses: { hidden: { color: "  #616E88 " } } },
+		});
+		expect(getHiddenExtensionStatusColor(config.components.extensionStatuses)).toBe("#616E88");
+		expect(
+			getHiddenExtensionStatusColor(
+				mergeConfig({ components: { extensionStatuses: { hidden: { color: 42 } } } })
+					.components.extensionStatuses,
+			),
+		).toBe("muted");
+	});
+
 	it("defaults to Original independently of legacy and Starship color choices", () => {
 		for (const raw of [
 			{},

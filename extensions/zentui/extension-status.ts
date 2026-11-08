@@ -12,12 +12,13 @@ import type {
 import {
 	getExtensionStatusColorMode,
 	getExtensionStatusPlacement,
+	getHiddenExtensionStatusColor,
 	getHiddenExtensionStatusColorMode,
 	getHiddenExtensionStatusPlacement,
 	isExtensionStatusPlacement,
 } from "./config.ts";
 import { truncateFooterText } from "./footer-text.ts";
-import { safeThemeFg } from "./style.ts";
+import { renderStyle, safeThemeFg } from "./style.ts";
 
 export type ExtensionStatusSegment = {
 	key: string;
@@ -166,7 +167,9 @@ export function renderExtensionStatusLine(
 			: sanitizeExtensionStatusText(value);
 		if (text) {
 			// Hidden has its own neutral theme styling; never borrow Starship's palette.
-			const styled = original ? text : safeThemeFg(theme, "muted", text);
+			const styled = original
+				? text
+				: renderStyle(theme, getHiddenExtensionStatusColor(policy), text);
 			zones[getHiddenExtensionStatusPlacement(policy, key)].push(closeExtensionStatusStyle(styled));
 		}
 	}

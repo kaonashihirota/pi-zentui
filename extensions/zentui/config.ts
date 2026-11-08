@@ -349,6 +349,8 @@ export type ExtensionStatusComponentConfig = ExtensionStatusVisibilityConfig & {
 		defaultPlacement?: HiddenExtensionStatusPlacement;
 		placements?: Record<string, HiddenExtensionStatusPlacement>;
 		colorModes?: Record<string, ExtensionStatusColorMode>;
+		/** Theme token, ANSI name, 256-palette index, or hex used by Zentui color mode. */
+		color?: string;
 	};
 };
 
@@ -1358,6 +1360,10 @@ export function getHiddenExtensionStatusPlacement(
 	);
 }
 
+export function getHiddenExtensionStatusColor(config: ExtensionStatusComponentConfig): string {
+	return config.hidden?.color ?? "muted";
+}
+
 export function getHiddenExtensionStatusColorMode(
 	config: ExtensionStatusComponentConfig,
 	key: string,
@@ -1385,6 +1391,9 @@ function resolveExtensionStatusComponent(raw: unknown): ExtensionStatusComponent
 										),
 									),
 								}
+							: {}),
+						...(typeof hidden.color === "string" && hidden.color.trim()
+							? { color: hidden.color.trim() }
 							: {}),
 						...(isRecord(hidden.placements)
 							? {
